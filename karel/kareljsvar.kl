@@ -1,0 +1,153 @@
+PROGRAM KARELJSVAR
+
+%NOLOCKGROUP
+%NOBUSYLAMP
+%NOPAUSE = ERROR + COMMAND
+%SYSTEM
+
+
+CONST
+-- Select System data type
+  TYPE_INTEGER = 16                                 -- Selectting system data type INTEGER
+  TYPE_REAL    = 17                                 -- Selectting system data type REAL
+  TYPE_BOOLEAN = 18                                 -- Selectting system data type BOOLEAN
+  TYPE_STRING  = 209                                -- Selectting system data type STRING
+  TYPE_SHORT   = 23                                 -- Selectting system data type SHORT
+  TYPE_BYTE    = 24                                 -- Selectting system data type BYTE
+  
+  SUCCESS      = 0
+  
+VAR
+	STATUS : INTEGER
+
+ROUTINE GETSYSVAR(var_path: STRING; value: STRING; data_type : INTEGER)			: BOOLEAN	FROM KARELJSVAR
+ROUTINE SETSYSVAR(var_path: STRING; value: STRING; data_type : INTEGER)	  		: BOOLEAN 	FROM KARELJSVAR
+
+ROUTINE GETVAR(var_path: STRING; value: STRING; data_type : INTEGER; prog : STRING)	: BOOLEAN	FROM KARELJSVAR
+ROUTINE SETVAR(var_path: STRING; value: STRING; data_type : INTEGER; prog : STRING)	: BOOLEAN 	FROM KARELJSVAR
+
+ROUTINE int_to_strg(int_value: INTEGER)					    		: STRING 	FROM klutils
+
+BEGIN
+END KARELJSVAR
+
+ROUTINE SETSYSVAR
+BEGIN
+	RETURN (SETVAR(var_path, value, data_type, '*SYSTEM*'))
+END SETSYSVAR
+
+ROUTINE GETSYSVAR
+BEGIN
+	RETURN (GETVAR(var_path, value, data_type, '*SYSTEM*'))
+END GETSYSVAR
+
+ROUTINE SETVAR
+VAR
+	entry        : INTEGER               -- Internal data (initialization unnecessary)
+   	sys_var_int  : INTEGER               -- system data(INTEGER)
+  	sys_var_real : REAL                  -- system data(REAL)
+   	sys_var_bool : BOOLEAN               -- system data(BOOLEAN)
+BEGIN
+	SELECT data_type OF
+	       CASE(TYPE_INTEGER):
+		CNV_STR_INT(value,sys_var_int)
+		SET_VAR(entry,prog,var_path, sys_var_int, STATUS)
+		IF STATUS <> SUCCESS THEN
+		   RETURN(FALSE)
+		ENDIF		
+	       CASE(TYPE_REAL):		
+		CNV_STR_REAL(value,sys_var_real)
+		SET_VAR(entry,prog,var_path, sys_var_real, STATUS)
+		IF STATUS <> SUCCESS THEN
+		   RETURN(FALSE)
+		ENDIF
+	       CASE(TYPE_STRING):
+		SET_VAR(entry,prog,var_path, value, STATUS)
+		IF STATUS <> SUCCESS THEN
+		   RETURN(FALSE)
+		ENDIF
+	       CASE(TYPE_BOOLEAN):
+		IF value = 'true' THEN
+		   sys_var_bool = true
+		ELSE
+		   sys_var_bool = false
+		ENDIF
+		SET_VAR(entry,prog,var_path, value, STATUS)
+		IF STATUS <> SUCCESS THEN
+		   RETURN(FALSE)
+		ENDIF
+	       ELSE:
+		RETURN (FALSE)
+	ENDSELECT
+	
+	RETURN (TRUE)
+END SETVAR
+
+ROUTINE GETVAR
+VAR
+	entry        : INTEGER               -- Internal data (initialization unnecessary)
+	boolean_chk  : BOOLEAN               -- Boolean data checker
+  	init_chk     : BOOLEAN               -- System data init checker:unused
+  	type_name    : STRING[12]            -- System data type(STRING):unused
+  	slen         : INTEGER               -- String data count
+  	alen         : ARRAY[3] OF INTEGER   -- Array data num
+   	sys_var_int  : INTEGER               -- system data(INTEGER)
+  	sys_var_real : REAL                  -- system data(REAL)
+  	sys_var_str  : STRING[254]           -- system data(STRING)
+  	sys_var_sho  : INTEGER               -- system data(SHORT)
+  	sys_var_byte : INTEGER               -- system data(BYTE)
+BEGIN
+
+  VAR_INFO(prog, var_path, init_chk, type_name, data_type, alen, slen, status)
+
+  IF(STATUS <> SUCCESS)THEN
+    POST_ERR(30176, 'Cannot get system data', 0, 0)
+    RETURN(FALSE)
+  ENDIF
+  
+  SELECT data_type OF
+    CASE(TYPE_INTEGER):
+      GET_VAR(entry, prog, var_path, sys_var_int, status)
+      IF (STATUS = SUCCESS) THEN
+      	 value = int_to_strg(sys_var_int)
+      ENDIF
+     CASE(TYPE_REAL):
+      GET_VAR(entry, prog, var_path, sys_var_real, status)
+      IF (STATUS = SUCCESS) THEN
+        CNV_REAL_STR(sys_var_real, 1, 3, sys_var_str)
+	value = sys_var_str
+      ENDIF
+    CASE(TYPE_BOOLEAN):
+      GET_VAR(entry, prog, var_path, boolean_chk, status)
+      IF (STATUS = SUCCESS) THEN
+        IF(boolean_chk = TRUE)THEN
+          value = 'true'
+        ELSE
+          value = 'false'
+        ENDIF
+      ENDIF
+    CASE(TYPE_STRING):
+      GET_VAR(entry, prog, var_path, sys_var_str, status)
+      IF (status = SUCCESS) THEN
+        value = sys_var_str
+      ENDIF
+    CASE(TYPE_SHORT):
+      GET_VAR(entry, prog, var_path, sys_var_sho, status)
+      
+      IF(sys_var_sho > 32766)THEN --SHORT_MAX
+        IF(sys_var_sho <> 36767)THEN --SHORT_UNINIT
+          sys_var_sho = sys_var_sho - 65536  -- CNV_NEGNUM
+        ENDIF
+      ENDIF
+      
+      IF (status = SUCCESS) THEN
+        value = int_to_strg(sys_var_sho)
+      ENDIF
+    CASE(TYPE_BYTE):
+      GET_VAR(entry, prog, var_path, sys_var_byte, status)
+      IF (status = SUCCESS) THEN
+        value = int_to_strg(sys_var_byte)
+      ENDIF
+  ENDSELECT
+  RETURN(TRUE)
+END GETVAR

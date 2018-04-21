@@ -1,0 +1,127 @@
+PROGRAM SETJSSYSVAR
+
+%NOLOCKGROUP
+%NOBUSYLAMP
+%NOPAUSE = ERROR + COMMAND
+%COMMENT = 'v1'
+
+CONST
+  TYPE_INTEGER = 16                                 -- Selectting system data type INTEGER
+  TYPE_REAL    = 17                                 -- Selectting system data type REAL
+  TYPE_BOOLEAN = 18                                 -- Selectting system data type BOOLEAN
+  TYPE_STRING  = 209                                -- Selectting system data type STRING
+  TYPE_SHORT   = 23                                 -- Selectting system data type SHORT
+  TYPE_BYTE    = 24                                 -- Selectting system data type BYTE
+
+VAR
+	STATUS : INTEGER
+	ENTRY  : INTEGER
+
+	name   : STRING[254] -- variablen name
+	value  : STRING[254] --string value
+	tdata  : INTEGER     --data type
+	data_type : STRING[254]	     
+
+	RFILE  : FILE
+
+ROUTINE CHECK_INPUT							: BOOLEAN FROM SETJSSYSVAR
+ROUTINE SETSYSVAR(var_path: STRING; value: STRING; data_type: INTEGER)  : BOOLEAN FROM KARELJSVAR
+ROUTINE failed 		    	    	   	   	       		  	  FROM SETJSSYSVAR
+ROUTINE success									  FROM SETJSSYSVAR
+
+BEGIN
+-- try open responce file first
+   OPEN FILE RFILE('RW','RD:Response.htm')
+   STATUS = IO_STATUS(RFILE)
+   IF STATUS <> 0 THEN
+      POST_ERR(STATUS, 'cannot open response file', 0, 2)
+      RETURN
+   ENDIF
+
+   IF CHECK_INPUT = FALSE THEN
+      failed
+   ELSE
+     IF SETSYSVAR(name, value, tdata) THEN
+     	success
+     ELSE
+	failed
+     ENDIF
+   ENDIF
+
+   CLOSE FILE RFILE
+
+END SETJSSYSVAR
+
+-- check query input in the checkinput function
+--
+-- the query string should be like
+--
+--	/KAREL/setsysjsvar?name=$ACC_MAXLMT&value=200&data_type=16
+--
+ROUTINE CHECK_INPUT
+BEGIN
+	IF (UNINIT(name)) THEN
+	   RETURN (FALSE)     
+	ELSE		
+	   IF(name='') THEN
+	   	 RETURN (FALSE)	 
+	   ENDIF
+	ENDIF
+	
+	IF (UNINIT(data_type)) THEN
+	   RETURN (FALSE)     
+	ELSE		
+	   IF(data_type='') THEN
+	   	 RETURN (FALSE)
+	   ELSE
+		CNV_STR_INT(data_type,tdata)
+	   ENDIF
+	ENDIF
+
+	IF (UNINIT(value))THEN
+	   RETURN (FALSE)
+	ELSE
+	   IF (value='') THEN
+	      RETURN (FALSE)
+	   ENDIF
+	ENDIF
+	RETURN (TRUE)
+END CHECK_INPUT
+
+------------------------------------------------------
+ROUTINE success
+BEGIN
+   WRITE RFILE('{')
+      WRITE RFILE('"result":true,')
+      SELECT tdata OF
+      	    CASE(TYPE_INTEGER):
+	     WRITE rfile('"value":'+value)
+      	    CASE(TYPE_SHORT):
+	     WRITE rfile('"value":'+value)
+	    CASE(TYPE_REAL):
+	     WRITE rfile('"value":'+value)
+	    CASE(TYPE_BOOLEAN):
+	     IF value = 'true' THEN
+	     	WRITE rfile('"value":true')
+	     ELSE
+	     	WRITE rfile('"value":false')
+	     ENDIF
+	    CASE(TYPE_STRING):
+	     WRITE rfile('"value":"'+value+'"')
+	    ELSE:
+	     WRITE rfile('"value":null')
+      ENDSELECT   
+      
+   WRITE RFILE('}')
+END success
+
+ROUTINE failed
+VAR
+   tmp: STRING[5]
+BEGIN
+   CNV_INT_STR(STATUS,5,10,tmp)
+   WRITE RFILE('{')
+      WRITE RFILE('"result":false,')
+      WRITE RFILE('"value":null')
+   WRITE RFILE('}')
+END failed

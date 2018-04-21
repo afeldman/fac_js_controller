@@ -1,0 +1,120 @@
+PROGRAM SETJSVAR
+
+%NOLOCKGROUP
+%NOBUSYLAMP
+%NOPAUSE = ERROR + COMMAND
+
+CONST
+  TYPE_INTEGER = 16                                 -- Selectting system data type INTEGER
+  TYPE_REAL    = 17                                 -- Selectting system data type REAL
+  TYPE_BOOLEAN = 18                                 -- Selectting system data type BOOLEAN
+  TYPE_STRING  = 209                                -- Selectting system data type STRING
+  TYPE_SHORT   = 23                                 -- Selectting system data type SHORT
+  TYPE_BYTE    = 24                                 -- Selectting system data type BYTE
+  
+VAR
+	STATUS : INTEGER
+	ENTRY  : INTEGER
+	name   : STRING[254]
+	prog   : STRING[254]
+
+	value  : STRING[20]
+	tdata  : INTEGER
+
+	RFILE  : FILE
+
+ROUTINE CHECK_INPUT									: BOOLEAN FROM SETJSVAR -- function to check the query input
+ROUTINE SETVAR(var_path: STRING; value: STRING; data_type : INTEGER; prog : STRING)  	: BOOLEAN FROM KARELJSVAR
+ROUTINE failed 		    	    	   	   	       		  	  	  	  FROM SETJSVAR
+ROUTINE success									  		  FROM SETJSVAR 
+ROUTINE int_to_strg(int_value: INTEGER)							: STRING  FROM klutils
+
+BEGIN
+-- try open responce file first
+   OPEN FILE RFILE('RW','RD:Response.htm')
+   STATUS = IO_STATUS(RFILE)
+   IF STATUS <> 0 THEN
+      POST_ERR(STATUS, 'cannot open response file', 0, 2)
+      RETURN
+   ENDIF
+
+   IF CHECK_INPUT = FALSE THEN
+      failed
+   ELSE
+     IF SETVAR(name, value, tdata, prog) THEN
+     	success
+     ELSE
+	failed
+     ENDIF
+   ENDIF
+
+   CLOSE FILE RFILE
+
+END SETJSVAR
+
+-- check query input in the checkinput function
+--
+-- the query string should be like
+--
+--	/KAREL/setjsvar?name=$Device&prog=test
+--
+ROUTINE CHECK_INPUT
+BEGIN
+	IF (UNINIT(name)) THEN
+	   RETURN (FALSE)     
+	ELSE		
+	   IF(name='') THEN
+	   	 RETURN (FALSE)	 
+	   ENDIF	   
+	ENDIF
+
+	IF (UNINIT(prog)) THEN
+	   RETURN (FALSE)     
+	ELSE		
+	   IF(prog='') THEN
+	   	 RETURN (FALSE)	 
+	   ENDIF	   
+	ENDIF
+
+	RETURN (TRUE)
+END CHECK_INPUT
+
+------------------------------------------------------
+ROUTINE success
+BEGIN
+   WRITE RFILE('{')
+      WRITE RFILE('"result":true,')
+       SELECT tdata OF
+      	    CASE(TYPE_INTEGER):
+	     WRITE rfile('"value":'+value)
+      	    CASE(TYPE_SHORT):
+	     WRITE rfile('"value":'+value)
+	    CASE(TYPE_REAL):
+	     WRITE rfile('"value":'+value)
+	    CASE(TYPE_BOOLEAN):
+	     IF value = 'true' THEN
+	     	WRITE rfile('"value":true')
+	     ELSE
+	     	WRITE rfile('"value":false')
+	     ENDIF
+	    CASE(TYPE_STRING):
+	     WRITE rfile('"value":"'+value+'"')
+	    ELSE:
+	     WRITE rfile('"value":null')
+      ENDSELECT
+      
+      WRITE RFILE(',"program":prog')
+   WRITE RFILE('}')
+END success
+
+ROUTINE failed
+VAR
+   tmp: STRING[5]
+BEGIN
+   CNV_INT_STR(STATUS,5,10,tmp)
+   WRITE RFILE('{')
+      WRITE RFILE('"result":false,')
+      WRITE RFILE('"value":null,')
+      WRITE RFILE('"program":null')
+   WRITE RFILE('}')
+END failed

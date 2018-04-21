@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+    <head>
+	<script src="json3.js" type="text/javascript"></script>
+	<script src="controller.js" type="text/javascript"></script>
+	<script type="text/javascript">
+	      var con = new Controller();
+	  function start(){
+	      var file_c = con.check_file('mc:test\\test.fcm');
+
+	      if(file_c[0].result && file_c[0].name){
+		  document.getElementById("File").innerHTML = file_c[0].name;
+	      }else{
+		  document.getElementById("File").innerHTML = file_c[0].result;
+	      }
+	  
+	      var device = con.get_var('$DEVICE');
+	      document.getElementById("var").innerHTML = device[1].value
+	  }
+	</script>
+    </head>
+    <body onload="start();">
+      <h1 id="File"></h1></br>
+      $DEVICE: <dev id="var"></dev></br>   
+	ACCMAXLIM <script type="text/javascript">con.set_var('$ACC_MAXLMT',100,KAREL_TYPE.INTEGER);</script></br>
+      ACCMaxLim <script type="text/javascript">con.set_var('$ACC_MAXLMT',200,KAREL_TYPE.INTEGER);</script></br>
+      KCL <script type="text/javascript">con.KCL('SHOW TASKS');</script>
+    </body>
+</html>

@@ -1,0 +1,64 @@
+PROGRAM CHKJSFS
+	%ALPHABETIZE
+	%NOLOCKGROUP
+	%NOABORT = ERROR + COMMAND
+	%NOPAUSE = ERROR + COMMAND + TPENABLE
+	%COMMENT = 'v1'
+	%NOBUSYLAMP
+
+VAR
+	filename: STRING[254]
+	ffile	: FILE
+	rfile   : FILE
+	STATUS  : INTEGER
+
+ROUTINE failed FROM CHKJSFS
+ROUTINE success FROM CHKJSFS
+
+BEGIN
+
+   STATUS = 0
+
+   OPEN FILE rfile('RW', 'RD:Response.htm')
+   STATUS = IO_STATUS(rfile)
+   IF STATUS <> 0 THEN
+      POST_ERR(STATUS, 'cannot open response file', 0, 2)
+   ENDIF
+	
+-- check the incomming filename
+   IF (UNINIT(filename)) THEN
+      failed
+   ELSE
+      IF (filename = '') THEN
+      	 failed
+      ELSE
+	OPEN FILE ffile('RO',filename)
+	STATUS = IO_STATUS(ffile)
+	CLOSE FILE ffile
+	IF STATUS <> 0 THEN
+	   failed
+	ELSE
+	   success
+	ENDIF
+      ENDIF
+   ENDIF   
+   
+   CLOSE FILE rfile
+
+END CHKJSFS
+
+ROUTINE success
+BEGIN
+   WRITE rfile('{')
+      WRITE rfile('"result":true,')
+      WRITE rfile('"name":"'+filename+'"')
+   WRITE rfile('}')
+END success
+
+ROUTINE failed
+BEGIN
+   WRITE rfile('{')
+      WRITE rfile('"result":false,')
+      WRITE rfile('"name":null')
+   WRITE rfile('}')
+END failed
